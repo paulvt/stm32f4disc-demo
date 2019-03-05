@@ -6,9 +6,9 @@
 extern crate panic_semihosting;
 
 //use cortex_m_semihosting::hprintln;
-use hal::gpio::{Output, PushPull};
+use hal::gpio::{ExtiPin, Output, PushPull};
 use hal::prelude::*;
-use rtfm::{app, Instant};
+use rtfm::app;
 
 type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
 
@@ -19,9 +19,9 @@ const APP: () = {
     static mut index: usize = ();
     static mut leds: [Led; 4] = ();
 
-    #[init(schedule = [switch_leds])]
+    #[init(spawn = [switch_leds])]
     fn init() -> init::LateResources {
-        // Set up the LEDs.
+        // Set up the LEDs and spawn the LEDs switch task.
         let gpiod = device.GPIOD.split();
         let leds = [
             gpiod.pd12.into_push_pull_output().downgrade(),
@@ -29,8 +29,8 @@ const APP: () = {
             gpiod.pd14.into_push_pull_output().downgrade(),
             gpiod.pd15.into_push_pull_output().downgrade(),
         ];
+        spawn.switch_leds().unwrap();
 
-        schedule.switch_leds(Instant::now() + PERIOD.cycles()).unwrap();
 
         init::LateResources { index: 0, leds }
     }
