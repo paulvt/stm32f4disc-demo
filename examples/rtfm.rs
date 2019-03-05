@@ -7,24 +7,48 @@
 
 extern crate panic_semihosting;
 
-use cortex_m_semihosting::hprintln;
-use rtfm::app;
+//use cortex_m_semihosting::hprintln;
+use hal::gpio::{Output, PushPull};
+use hal::prelude::*;
+use rtfm::{app, Instant};
+
+type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
+
+const PERIOD: u32 = 8_000_000;
 
 #[app(device = hal::stm32)]
 const APP: () = {
-    #[init]
-    fn init() {
-        static mut X: u32 = 0;
+    static mut index: usize = ();
+    static mut leds: [Led; 4] = ();
 
-        // Cortex-M peripherals
-        let _core: rtfm::Peripherals = core;
+    #[init(schedule = [switch_leds])]
+    fn init() -> init::LateResources {
+        // Set up the LEDs.
+        let gpiod = device.GPIOD.split();
+        let leds = [
+            gpiod.pd12.into_push_pull_output().downgrade(),
+            gpiod.pd13.into_push_pull_output().downgrade(),
+            gpiod.pd14.into_push_pull_output().downgrade(),
+            gpiod.pd15.into_push_pull_output().downgrade(),
+        ];
 
-        // Device specific peripherals
-        let _device: hal::stm32::Peripherals = device;
+        schedule.switch_leds(Instant::now() + PERIOD.cycles()).unwrap();
 
-        // Safe access to local `static mut` variable
-        let _x: &'static mut u32 = X;
+        init::LateResources { index: 0, leds }
+    }
 
-        hprintln!("init").unwrap();
+    #[task(schedule = [switch_leds], resources = [index, leds])]
+    fn switch_leds() {
+        let index = *resources.index;
+        let num_leds = resources.leds.len();
+        resources.leds[index].set_high();
+        resources.leds[(index + 2) % num_leds].set_low();
+        *resources.index = (index + 1) % 4;
+
+        schedule.switch_leds(scheduled + PERIOD.cycles()).unwrap();
+    }
+
+    extern "C" {
+        fn UART4();
     }
 };
