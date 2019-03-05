@@ -1,47 +1,52 @@
 #![deny(unsafe_code)]
 #![deny(warnings)]
-#![no_std]
 #![no_main]
+#![no_std]
 
-#[cfg(debug_assertions)]
 extern crate panic_semihosting;
 
-#[cfg(not(debug_assertions))]
-extern crate panic_abort;
-
-use cortex_m_rt::entry;
 //use cortex_m_semihosting::hprintln;
-use hal::delay::Delay;
+use hal::gpio::{Output, PushPull};
 use hal::prelude::*;
+use rtfm::{app, Instant};
 
-#[entry]
-fn main() -> ! {
-    // Get handles to the hardware.
-    let core = cortex_m::Peripherals::take().unwrap();
-    let device = hal::stm32::Peripherals::take().unwrap();
+type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
 
-    // Get a clock for the delay.
-    let rcc = device.RCC.constrain();
-    let clocks = rcc.cfgr.freeze();
-    let mut delay = Delay::new(core.SYST, clocks);
+const PERIOD: u32 = 8_000_000;
 
-    // Set up the LEDs.
-    let gpiod = device.GPIOD.split();
-    let mut leds = [
-        gpiod.pd12.into_push_pull_output().downgrade(),
-        gpiod.pd13.into_push_pull_output().downgrade(),
-        gpiod.pd14.into_push_pull_output().downgrade(),
-        gpiod.pd15.into_push_pull_output().downgrade(),
-    ];
-    let num_leds = leds.len();
-    assert_eq!(num_leds, 4);
+#[app(device = hal::stm32)]
+const APP: () = {
+    static mut index: usize = ();
+    static mut leds: [Led; 4] = ();
 
-    // Blink the LED...
-    loop {
-        for index in 0..num_leds {
-            leds[index].set_high();
-            leds[(index + 1) % num_leds].set_low();
-            delay.delay_ms(500u16);
-        }
+    #[init(schedule = [switch_leds])]
+    fn init() -> init::LateResources {
+        // Set up the LEDs.
+        let gpiod = device.GPIOD.split();
+        let leds = [
+            gpiod.pd12.into_push_pull_output().downgrade(),
+            gpiod.pd13.into_push_pull_output().downgrade(),
+            gpiod.pd14.into_push_pull_output().downgrade(),
+            gpiod.pd15.into_push_pull_output().downgrade(),
+        ];
+
+        schedule.switch_leds(Instant::now() + PERIOD.cycles()).unwrap();
+
+        init::LateResources { index: 0, leds }
     }
-}
+
+    #[task(schedule = [switch_leds], resources = [index, leds])]
+    fn switch_leds() {
+        let index = *resources.index;
+        let num_leds = resources.leds.len();
+        resources.leds[index].set_high();
+        resources.leds[(index + 2) % num_leds].set_low();
+        *resources.index = (index + 1) % 4;
+
+        schedule.switch_leds(scheduled + PERIOD.cycles()).unwrap();
+    }
+
+    extern "C" {
+        fn UART4();
+    }
+};
