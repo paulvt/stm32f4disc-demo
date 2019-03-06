@@ -84,6 +84,6 @@ const APP: () = {
     }
 
     extern "C" {
-        fn UART4();
+        fn TIM2();
     }
 };
