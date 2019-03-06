@@ -8,6 +8,7 @@ extern crate panic_semihosting;
 //use cortex_m_semihosting::hprintln;
 use hal::gpio::{Edge, ExtiPin, Floating, Input, Output, PushPull};
 use hal::prelude::*;
+use hal::stm32::EXTI;
 use rtfm::app;
 
 type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
@@ -35,7 +36,7 @@ const APP: () = {
     static mut leds: [Led; 4] = ();
     static mut led_cycle_direction: LedDirection = LedDirection::Clockwise;
     static mut led_index: usize = 0;
-    static mut exti: hal::stm32::EXTI = ();
+    static mut exti: EXTI = ();
 
     #[init(spawn = [switch_leds])]
     fn init() -> init::LateResources {
