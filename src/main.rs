@@ -11,6 +11,7 @@ use hal::prelude::*;
 use rtfm::app;
 
 type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
+type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
 
 const PERIOD: u32 = 8_000_000;
 
@@ -21,7 +22,7 @@ pub enum LedDirection {
 
 #[app(device = hal::stm32)]
 const APP: () = {
-    static mut button: hal::gpio::gpioa::PA0<Input<Floating>> = ();
+    static mut button: UserButton = ();
     static mut leds: [Led; 4] = ();
     static mut led_cycle_direction: LedDirection = LedDirection::Clockwise;
     static mut led_index: usize = 0;
