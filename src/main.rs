@@ -20,6 +20,15 @@ pub enum LedDirection {
     CounterClockwise,
 }
 
+impl LedDirection {
+    fn flip(&self) -> LedDirection {
+        match self {
+            LedDirection::Clockwise => LedDirection::CounterClockwise,
+            LedDirection::CounterClockwise => LedDirection::Clockwise,
+        }
+    }
+}
+
 #[app(device = hal::stm32)]
 const APP: () = {
     static mut button: UserButton = ();
@@ -68,10 +77,8 @@ const APP: () = {
 
     #[interrupt(binds = EXTI0, resources = [button, exti, led_cycle_direction])]
     fn button_pressed() {
-        *resources.led_cycle_direction = match *resources.led_cycle_direction {
-            LedDirection::Clockwise => LedDirection::CounterClockwise,
-            LedDirection::CounterClockwise => LedDirection::Clockwise,
-        };
+        *resources.led_cycle_direction = resources.led_cycle_direction.flip();
+
         resources.button.clear_interrupt_pending_bit(resources.exti);
     }
 
