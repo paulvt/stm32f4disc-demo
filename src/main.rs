@@ -5,9 +5,12 @@
 
 extern crate panic_semihosting;
 
+mod led;
+
+use crate::led::{Led, LedCycle};
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
-use hal::gpio::{Edge, ExtiPin, Floating, Input, Output, PushPull};
+use hal::gpio::{Edge, ExtiPin, Floating, Input};
 use hal::prelude::*;
 use hal::serial::{self, config::Config as SerialConfig, Serial};
 use hal::stm32::{EXTI, USART1};
@@ -15,80 +18,9 @@ use heapless::consts::U8;
 use heapless::Vec;
 use rtfm::app;
 
-type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
 type SerialTx = hal::serial::Tx<USART1>;
 type SerialRx = hal::serial::Rx<USART1>;
 type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
-
-pub enum LedDirection {
-    Clockwise,
-    CounterClockwise,
-}
-
-impl LedDirection {
-    fn flip(&self) -> LedDirection {
-        match self {
-            LedDirection::Clockwise => LedDirection::CounterClockwise,
-            LedDirection::CounterClockwise => LedDirection::Clockwise,
-        }
-    }
-}
-
-pub struct LedCycle {
-    pub enabled: bool,
-    pub direction: LedDirection,
-    pub index: usize,
-    pub leds: [Led; 4]
-}
-
-impl LedCycle {
-    const PERIOD: u32 = 8_000_000;
-
-    fn from(leds: [Led; 4]) -> LedCycle {
-        LedCycle {
-            enabled: true,
-            direction: LedDirection::Clockwise,
-            index: 0,
-            leds
-        }
-    }
-
-    fn disable(&mut self) {
-        self.enabled = false;
-    }
-
-    fn enable(&mut self) {
-        self.enabled = true;
-    }
-
-    fn reverse(&mut self) {
-        self.direction = self.direction.flip();
-    }
-
-    fn advance(&mut self) {
-        let num_leds = self.leds.len();
-
-        self.leds[self.index].set_high();
-        self.leds[(self.index + 2) % num_leds].set_low();
-
-        self.index = match self.direction {
-            LedDirection::Clockwise => (self.index + 1) % num_leds,
-            LedDirection::CounterClockwise => (self.index + 3) % num_leds,
-        };
-    }
-
-    fn all_on(&mut self) {
-        for led in self.leds.iter_mut() {
-            led.set_high();
-        }
-    }
-
-    fn all_off(&mut self) {
-        for led in self.leds.iter_mut() {
-            led.set_low();
-        }
-    }
-}
 
 #[app(device = hal::stm32)]
 const APP: () = {
@@ -147,7 +79,9 @@ const APP: () = {
         resources.led_cycle.lock(|led_cycle| {
             if led_cycle.enabled {
                 led_cycle.advance();
-                schedule.switch_leds(scheduled + LedCycle::PERIOD.cycles()).unwrap();
+                schedule
+                    .switch_leds(scheduled + LedCycle::PERIOD.cycles())
+                    .unwrap();
             }
         });
     }
