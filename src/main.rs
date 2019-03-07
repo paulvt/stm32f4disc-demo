@@ -33,7 +33,7 @@ const APP: () = {
 
     #[init(spawn = [switch_leds])]
     fn init() -> init::LateResources {
-        // Set up the LEDs and spawn the LEDs switch task.
+        // Set up the LED cycle and spawn the LEDs switch task.
         let gpiod = device.GPIOD.split();
         let leds = [
             gpiod.pd12.into_push_pull_output().downgrade(),
@@ -44,7 +44,7 @@ const APP: () = {
         let led_cycle = LedCycle::from(leds);
         spawn.switch_leds().unwrap();
 
-        // Set up the EXTI0 interrup for the user button.
+        // Set up the EXTI0 interrupt for the user button.
         let mut exti = device.EXTI;
         let gpioa = device.GPIOA.split();
         let mut button = gpioa.pa0.into_floating_input();
