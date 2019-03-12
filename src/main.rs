@@ -10,6 +10,7 @@ mod led;
 use crate::led::{Led, LedCycle};
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
+use hal::block;
 use hal::gpio::{Edge, ExtiPin, Floating, Input};
 use hal::prelude::*;
 use hal::serial::{self, config::Config as SerialConfig, Serial};
@@ -109,12 +110,12 @@ const APP: () = {
 
         // Read a byte from the serial port and write it back.
         let byte = resources.serial_rx.read().unwrap();
-        resources.serial_tx.write(byte).unwrap();
+        block!(resources.serial_tx.write(byte)).unwrap();
         //hprintln!("serial: {}", byte).unwrap();
 
         // Handle the command in the buffer for newline, otherwise append to the buffer.
         if byte == b'\r' {
-            resources.serial_tx.write(b'\n').unwrap();
+            block!(resources.serial_tx.write(b'\n')).unwrap();
             match &buffer[..] {
                 b"flip" => {
                     resources.led_cycle.reverse();
