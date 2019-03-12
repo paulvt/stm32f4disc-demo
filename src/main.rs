@@ -93,7 +93,7 @@ const APP: () = {
         // Write the fact that the button has been pressed to the serial port.
         resources
             .serial_tx
-            .lock(|serial_tx| writeln!(serial_tx, "button").unwrap());
+            .lock(|serial_tx| writeln!(serial_tx, "button\r").unwrap());
 
         resources.button.clear_interrupt_pending_bit(resources.exti);
     }
@@ -114,6 +114,7 @@ const APP: () = {
 
         // Handle the command in the buffer for newline, otherwise append to the buffer.
         if byte == b'\r' {
+            resources.serial_tx.write(b'\n').unwrap();
             match &buffer[..] {
                 b"flip" => {
                     resources.led_cycle.reverse();
@@ -133,7 +134,9 @@ const APP: () = {
                     resources.led_cycle.disable();
                     resources.led_cycle.all_on();
                 }
-                _ => {}
+                _ => {
+                    writeln!(resources.serial_tx, "?\r").unwrap();
+                }
             }
 
             buffer.clear();
