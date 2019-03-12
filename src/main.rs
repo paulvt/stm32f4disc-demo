@@ -113,7 +113,8 @@ const APP: () = {
         block!(resources.serial_tx.write(byte)).unwrap();
         //hprintln!("serial: {}", byte).unwrap();
 
-        // Handle the command in the buffer for newline, otherwise append to the buffer.
+        // Handle the command in the buffer for newline or backspace, otherwise append to the
+        // buffer.
         if byte == b'\r' {
             block!(resources.serial_tx.write(b'\n')).unwrap();
             match &buffer[..] {
@@ -141,12 +142,18 @@ const APP: () = {
             }
 
             buffer.clear();
+        } else if byte == 0x7F {
+            buffer.pop();
+            block!(resources.serial_tx.write(b'\r')).unwrap();
+            for byte in buffer {
+                block!(resources.serial_tx.write(*byte)).unwrap();
+            }
         } else {
             if buffer.push(byte).is_err() {
                 hprintln!("Serial read buffer full!").unwrap();
             }
-            //hprintln!("buffer: {:?}", buffer).unwrap();
         }
+        //hprintln!("buffer: {:?}", buffer).unwrap();
     }
 
     extern "C" {
