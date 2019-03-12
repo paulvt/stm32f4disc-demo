@@ -52,7 +52,7 @@ const APP: () = {
         button.enable_interrupt(&mut exti);
         button.trigger_on_edge(&mut exti, Edge::RISING);
 
-        // Set up the serial interface.
+        // Set up the serial interface and the USART2 interrupt.
         let tx = gpioa.pa2.into_alternate_af7();
         let rx = gpioa.pa3.into_alternate_af7();
         let config = SerialConfig::default().baudrate(115_200.bps());
