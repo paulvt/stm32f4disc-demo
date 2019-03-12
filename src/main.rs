@@ -13,13 +13,13 @@ use cortex_m_semihosting::hprintln;
 use hal::gpio::{Edge, ExtiPin, Floating, Input};
 use hal::prelude::*;
 use hal::serial::{self, config::Config as SerialConfig, Serial};
-use hal::stm32::{EXTI, USART1};
+use hal::stm32::{EXTI, USART2};
 use heapless::consts::U8;
 use heapless::Vec;
 use rtfm::app;
 
-type SerialTx = hal::serial::Tx<USART1>;
-type SerialRx = hal::serial::Rx<USART1>;
+type SerialTx = hal::serial::Tx<USART2>;
+type SerialRx = hal::serial::Rx<USART2>;
 type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
 
 #[app(device = hal::stm32)]
@@ -52,12 +52,12 @@ const APP: () = {
         button.trigger_on_edge(&mut exti, Edge::RISING);
 
         // Set up the serial interface.
-        let tx = gpioa.pa9.into_alternate_af7();
-        let rx = gpioa.pa10.into_alternate_af7();
-        let config = SerialConfig::default();
+        let tx = gpioa.pa2.into_alternate_af7();
+        let rx = gpioa.pa3.into_alternate_af7();
+        let config = SerialConfig::default().baudrate(115_200.bps());
         let rcc = device.RCC.constrain();
         let clocks = rcc.cfgr.freeze();
-        let mut serial = Serial::usart1(device.USART1, (tx, rx), config, clocks).unwrap();
+        let mut serial = Serial::usart2(device.USART2, (tx, rx), config, clocks).unwrap();
         serial.listen(serial::Event::Rxne);
         let (serial_tx, serial_rx) = serial.split();
 
@@ -99,7 +99,7 @@ const APP: () = {
     }
 
     #[interrupt(
-        binds = USART1,
+        binds = USART2,
         priority = 2,
         resources = [buffer, led_cycle, serial_rx, serial_tx],
         spawn = [switch_leds]
