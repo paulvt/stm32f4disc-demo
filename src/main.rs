@@ -86,9 +86,14 @@ const APP: () = {
         });
     }
 
-    #[interrupt(binds = EXTI0, resources = [button, exti, led_cycle])]
+    #[interrupt(binds = EXTI0, resources = [button, exti, led_cycle, serial_tx])]
     fn button_pressed() {
         resources.led_cycle.lock(|led_cycle| led_cycle.reverse());
+
+        // Write the fact that the button has been pressed to the serial port.
+        resources
+            .serial_tx
+            .lock(|serial_tx| writeln!(serial_tx, "button").unwrap());
 
         resources.button.clear_interrupt_pending_bit(resources.exti);
     }
