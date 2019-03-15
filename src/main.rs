@@ -32,7 +32,7 @@ const APP: () = {
     static mut serial_rx: SerialRx = ();
     static mut serial_tx: SerialTx = ();
 
-    #[init(spawn = [switch_leds])]
+    #[init(spawn = [cycle_leds])]
     fn init() -> init::LateResources {
         // Set up the LED ring and spawn the LEDs switch task.
         let gpiod = device.GPIOD.split();
@@ -43,7 +43,9 @@ const APP: () = {
             gpiod.pd15.into_push_pull_output().downgrade(),
         ];
         let led_ring = LedRing::from(leds);
-        spawn.switch_leds().unwrap();
+        if led_ring.is_mode_cycle() {
+            spawn.cycle_leds().unwrap();
+        }
 
         // Set up the EXTI0 interrupt for the user button.
         let mut exti = device.EXTI;
@@ -103,7 +105,7 @@ const APP: () = {
         binds = USART2,
         priority = 2,
         resources = [buffer, led_ring, serial_rx, serial_tx],
-        spawn = [switch_leds]
+        spawn = [cycle_leds]
     )]
     fn handle_serial() {
         let buffer = resources.buffer;
@@ -126,7 +128,7 @@ const APP: () = {
                 }
                 b"cycle" => {
                     resources.led_ring.enable_cycle();
-                    spawn.switch_leds().unwrap();
+                    spawn.cycle_leds().unwrap();
                 }
                 b"off" => {
                     resources.led_ring.disable();
