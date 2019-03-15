@@ -3,45 +3,56 @@ use hal::prelude::*;
 
 pub type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
 
-pub enum LedDirection {
+#[derive(Debug, Eq, PartialEq)]
+pub enum Direction {
     Clockwise,
     CounterClockwise,
 }
 
-impl LedDirection {
-    fn flip(&self) -> LedDirection {
+impl Direction {
+    fn flip(&self) -> Direction {
         match self {
-            LedDirection::Clockwise => LedDirection::CounterClockwise,
-            LedDirection::CounterClockwise => LedDirection::Clockwise,
+            Direction::Clockwise => Direction::CounterClockwise,
+            Direction::CounterClockwise => Direction::Clockwise,
         }
     }
 }
 
-pub struct LedCycle {
-    pub enabled: bool,
-    pub direction: LedDirection,
+#[derive(Debug, Eq, PartialEq)]
+pub enum Mode {
+    Off,
+    Cycle,
+}
+
+pub struct LedRing {
+    pub direction: Direction,
+    pub mode: Mode,
     pub index: usize,
     pub leds: [crate::Led; 4],
 }
 
-impl LedCycle {
+impl LedRing {
     pub const PERIOD: u32 = 8_000_000;
 
-    pub fn from(leds: [crate::Led; 4]) -> LedCycle {
-        LedCycle {
-            enabled: true,
-            direction: LedDirection::Clockwise,
+    pub fn from(leds: [crate::Led; 4]) -> LedRing {
+        LedRing {
+            direction: Direction::Clockwise,
+            mode: Mode::Cycle,
             index: 0,
             leds,
         }
     }
 
-    pub fn disable(&mut self) {
-        self.enabled = false;
+    pub fn enable_cycle(&mut self) {
+        self.mode = Mode::Cycle;
     }
 
-    pub fn enable(&mut self) {
-        self.enabled = true;
+    pub fn disable(&mut self) {
+        self.mode = Mode::Off;
+    }
+
+    pub fn is_mode_cycle(&self) -> bool {
+        self.mode == Mode::Cycle
     }
 
     pub fn reverse(&mut self) {
@@ -55,8 +66,8 @@ impl LedCycle {
         self.leds[(self.index + 2) % num_leds].set_low();
 
         self.index = match self.direction {
-            LedDirection::Clockwise => (self.index + 1) % num_leds,
-            LedDirection::CounterClockwise => (self.index + 3) % num_leds,
+            Direction::Clockwise => (self.index + 1) % num_leds,
+            Direction::CounterClockwise => (self.index + 3) % num_leds,
         };
     }
 

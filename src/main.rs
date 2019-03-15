@@ -7,7 +7,7 @@ extern crate panic_semihosting;
 
 mod led;
 
-use crate::led::{Led, LedCycle};
+use crate::led::{Led, LedRing};
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
 use hal::block;
@@ -27,14 +27,14 @@ type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
 const APP: () = {
     static mut button: UserButton = ();
     static mut buffer: Vec<u8, U8> = ();
-    static mut led_cycle: LedCycle = ();
+    static mut led_ring: LedRing = ();
     static mut exti: EXTI = ();
     static mut serial_rx: SerialRx = ();
     static mut serial_tx: SerialTx = ();
 
     #[init(spawn = [switch_leds])]
     fn init() -> init::LateResources {
-        // Set up the LED cycle and spawn the LEDs switch task.
+        // Set up the LED ring and spawn the LEDs switch task.
         let gpiod = device.GPIOD.split();
         let leds = [
             gpiod.pd12.into_push_pull_output().downgrade(),
@@ -42,7 +42,7 @@ const APP: () = {
             gpiod.pd14.into_push_pull_output().downgrade(),
             gpiod.pd15.into_push_pull_output().downgrade(),
         ];
-        let led_cycle = LedCycle::from(leds);
+        let led_ring = LedRing::from(leds);
         spawn.switch_leds().unwrap();
 
         // Set up the EXTI0 interrupt for the user button.
@@ -69,19 +69,19 @@ const APP: () = {
             button,
             buffer,
             exti,
-            led_cycle,
+            led_ring,
             serial_tx,
             serial_rx,
         }
     }
 
-    #[task(schedule = [switch_leds], resources = [led_cycle])]
+    #[task(schedule = [switch_leds], resources = [led_ring])]
     fn switch_leds() {
-        resources.led_cycle.lock(|led_cycle| {
-            if led_cycle.enabled {
-                led_cycle.advance();
+        resources.led_ring.lock(|led_ring| {
+            if led_ring.is_mode_cycle() {
+                led_ring.advance();
                 schedule
-                    .switch_leds(scheduled + LedCycle::PERIOD.cycles())
+                    .switch_leds(scheduled + LedRing::PERIOD.cycles())
                     .unwrap();
             }
         });
@@ -89,7 +89,7 @@ const APP: () = {
 
     #[interrupt(binds = EXTI0, resources = [button, exti, led_cycle, serial_tx])]
     fn button_pressed() {
-        resources.led_cycle.lock(|led_cycle| led_cycle.reverse());
+        resources.led_ring.lock(|led_ring| led_ring.reverse());
 
         // Write the fact that the button has been pressed to the serial port.
         resources
@@ -102,7 +102,7 @@ const APP: () = {
     #[interrupt(
         binds = USART2,
         priority = 2,
-        resources = [buffer, led_cycle, serial_rx, serial_tx],
+        resources = [buffer, led_ring, serial_rx, serial_tx],
         spawn = [switch_leds]
     )]
     fn handle_serial() {
@@ -119,22 +119,22 @@ const APP: () = {
             block!(resources.serial_tx.write(b'\n')).unwrap();
             match &buffer[..] {
                 b"flip" => {
-                    resources.led_cycle.reverse();
+                    resources.led_ring.reverse();
                 }
                 b"stop" => {
-                    resources.led_cycle.disable();
+                    resources.led_ring.disable();
                 }
-                b"start" => {
-                    resources.led_cycle.enable();
+                b"cycle" => {
+                    resources.led_ring.enable_cycle();
                     spawn.switch_leds().unwrap();
                 }
                 b"off" => {
-                    resources.led_cycle.disable();
-                    resources.led_cycle.all_off();
+                    resources.led_ring.disable();
+                    resources.led_ring.all_off();
                 }
                 b"on" => {
-                    resources.led_cycle.disable();
-                    resources.led_cycle.all_on();
+                    resources.led_ring.disable();
+                    resources.led_ring.all_on();
                 }
                 _ => {
                     writeln!(resources.serial_tx, "?\r").unwrap();
