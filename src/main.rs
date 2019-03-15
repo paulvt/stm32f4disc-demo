@@ -62,10 +62,13 @@ const APP: () = {
         let clocks = rcc.cfgr.freeze();
         let mut serial = Serial::usart2(device.USART2, (tx, rx), config, clocks).unwrap();
         serial.listen(serial::Event::Rxne);
-        let (serial_tx, serial_rx) = serial.split();
+        let (mut serial_tx, serial_rx) = serial.split();
 
         // Set up the serial interface command buffer.
         let buffer = Vec::new();
+
+        // Output to the serial interface that initialisation is finished.
+        writeln!(serial_tx, "init\r").unwrap();
 
         init::LateResources {
             button,
