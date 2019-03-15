@@ -22,6 +22,7 @@ impl Direction {
 pub enum Mode {
     Off,
     Cycle,
+    Accelerometer
 }
 
 pub struct LedRing {
@@ -47,12 +48,20 @@ impl LedRing {
         self.mode = Mode::Cycle;
     }
 
+    pub fn enable_accel(&mut self) {
+        self.mode = Mode::Accelerometer;
+    }
+
     pub fn disable(&mut self) {
         self.mode = Mode::Off;
     }
 
     pub fn is_mode_cycle(&self) -> bool {
         self.mode == Mode::Cycle
+    }
+
+    pub fn is_mode_accel(&self) -> bool {
+        self.mode == Mode::Accelerometer
     }
 
     pub fn reverse(&mut self) {
@@ -80,6 +89,17 @@ impl LedRing {
     pub fn all_off(&mut self) {
         for led in self.leds.iter_mut() {
             led.set_low();
+        }
+    }
+
+    pub fn set_directions(&mut self, directions: [bool; 4]) {
+        for setting in self.leds.iter_mut().zip(directions.iter()) {
+            let (led, on_off) = setting;
+            if *on_off {
+                led.set_high();
+            } else {
+                led.set_low();
+            }
         }
     }
 }

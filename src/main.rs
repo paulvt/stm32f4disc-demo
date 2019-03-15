@@ -11,16 +11,22 @@ use crate::led::{Led, LedRing};
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
 use hal::block;
-use hal::gpio::{Edge, ExtiPin, Floating, Input};
+use hal::gpio::{Alternate, Edge, ExtiPin, Floating, Input, Output, PushPull, AF5};
 use hal::prelude::*;
 use hal::serial::{self, config::Config as SerialConfig, Serial};
-use hal::stm32::{EXTI, USART2};
+use hal::spi::{Mode, Phase, Polarity, Spi};
+use hal::stm32::{EXTI, SPI1, USART2};
 use heapless::consts::U8;
 use heapless::Vec;
 use rtfm::app;
 
+type Accelerometer = hal::spi::Spi<SPI1, (Spi1Sck, Spi1Miso, Spi1Mosi)>;
+type AccelerometerCs = hal::gpio::gpioe::PE3<Output<PushPull>>;
 type SerialTx = hal::serial::Tx<USART2>;
 type SerialRx = hal::serial::Rx<USART2>;
+type Spi1Sck = hal::gpio::gpioa::PA5<Alternate<AF5>>;
+type Spi1Miso = hal::gpio::gpioa::PA6<Alternate<AF5>>;
+type Spi1Mosi = hal::gpio::gpioa::PA7<Alternate<AF5>>;
 type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
 
 #[app(device = hal::stm32)]
@@ -31,8 +37,10 @@ const APP: () = {
     static mut exti: EXTI = ();
     static mut serial_rx: SerialRx = ();
     static mut serial_tx: SerialTx = ();
+    static mut accel: Accelerometer = ();
+    static mut accel_cs: AccelerometerCs = ();
 
-    #[init(spawn = [cycle_leds])]
+    #[init(spawn = [accel_leds, cycle_leds])]
     fn init() -> init::LateResources {
         // Set up the LED ring and spawn the LEDs switch task.
         let gpiod = device.GPIOD.split();
@@ -45,6 +53,8 @@ const APP: () = {
         let led_ring = LedRing::from(leds);
         if led_ring.is_mode_cycle() {
             spawn.cycle_leds().unwrap();
+        } else if led_ring.is_mode_accel() {
+            spawn.accel_leds().unwrap();
         }
 
         // Set up the EXTI0 interrupt for the user button.
@@ -67,6 +77,24 @@ const APP: () = {
         // Set up the serial interface command buffer.
         let buffer = Vec::new();
 
+        // Set up the accelerometer.
+        let sck = gpioa.pa5.into_alternate_af5();
+        let miso = gpioa.pa6.into_alternate_af5();
+        let mosi = gpioa.pa7.into_alternate_af5();
+        let mode = Mode {
+            polarity: Polarity::IdleHigh,
+            phase: Phase::CaptureOnSecondTransition,
+        };
+        let mut accel = Spi::spi1(device.SPI1, (sck, miso, mosi), mode, 100.hz(), clocks);
+
+        let gpioe = device.GPIOE.split();
+        let mut accel_cs = gpioe.pe3.into_push_pull_output();
+
+        // Initialize the accelerometer.
+        accel_cs.set_low();
+        let _ = accel.transfer(&mut [0x20, 0b01000111]).unwrap();
+        accel_cs.set_high();
+
         // Output to the serial interface that initialisation is finished.
         writeln!(serial_tx, "init\r").unwrap();
 
@@ -77,22 +105,51 @@ const APP: () = {
             led_ring,
             serial_tx,
             serial_rx,
+            accel,
+            accel_cs,
         }
     }
 
-    #[task(schedule = [switch_leds], resources = [led_ring])]
-    fn switch_leds() {
+    #[task(schedule = [cycle_leds], resources = [led_ring])]
+    fn cycle_leds() {
         resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_cycle() {
                 led_ring.advance();
                 schedule
-                    .switch_leds(scheduled + LedRing::PERIOD.cycles())
+                    .cycle_leds(scheduled + LedRing::PERIOD.cycles())
                     .unwrap();
             }
         });
     }
 
-    #[interrupt(binds = EXTI0, resources = [button, exti, led_cycle, serial_tx])]
+    #[task(schedule = [accel_leds], resources = [accel, accel_cs, led_ring, serial_tx])]
+    fn accel_leds() {
+        resources.accel_cs.set_low();
+        let read_command = (1 << 7) | (1 << 6) | 0x29;
+        let mut commands = [read_command, 0x0, 0x0, 0x0];
+        let result = resources.accel.transfer(&mut commands[..]).unwrap();
+        let acc_x = result[1] as i8;
+        let acc_y = result[3] as i8;
+        resources.accel_cs.set_high();
+
+        if acc_x == 0 && acc_y == 0 {
+            resources
+                .serial_tx
+                .lock(|serial_tx|
+                    writeln!(serial_tx, "level\r").unwrap()
+                );
+        }
+
+        resources.led_ring.lock(|led_ring| {
+            if led_ring.is_mode_accel() {
+                let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
+                led_ring.set_directions(directions);
+                schedule.accel_leds(scheduled + LedRing::PERIOD.cycles()).unwrap();
+            }
+        })
+    }
+
+    #[interrupt(binds = EXTI0, resources = [button, exti, led_ring, serial_tx])]
     fn button_pressed() {
         resources.led_ring.lock(|led_ring| led_ring.reverse());
 
@@ -108,7 +165,7 @@ const APP: () = {
         binds = USART2,
         priority = 2,
         resources = [buffer, led_ring, serial_rx, serial_tx],
-        spawn = [cycle_leds]
+        spawn = [accel_leds, cycle_leds]
     )]
     fn handle_serial() {
         let buffer = resources.buffer;
@@ -132,6 +189,10 @@ const APP: () = {
                 b"cycle" => {
                     resources.led_ring.enable_cycle();
                     spawn.cycle_leds().unwrap();
+                }
+                b"accel" => {
+                    resources.led_ring.enable_accel();
+                    spawn.accel_leds().unwrap();
                 }
                 b"off" => {
                     resources.led_ring.disable();
@@ -163,5 +224,6 @@ const APP: () = {
 
     extern "C" {
         fn TIM2();
+        fn TIM3();
     }
 };
