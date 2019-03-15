@@ -5,9 +5,9 @@
 
 extern crate panic_semihosting;
 
-mod led;
+mod led_ring;
 
-use crate::led::{Led, LedRing};
+use crate::led_ring::{Led, LedRing};
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
 use hal::block;
