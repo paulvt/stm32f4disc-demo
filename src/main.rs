@@ -135,16 +135,16 @@ const APP: () = {
         if acc_x == 0 && acc_y == 0 {
             resources
                 .serial_tx
-                .lock(|serial_tx|
-                    writeln!(serial_tx, "level\r").unwrap()
-                );
+                .lock(|serial_tx| writeln!(serial_tx, "level\r").unwrap());
         }
 
         resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_accel() {
                 let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
                 led_ring.set_directions(directions);
-                schedule.accel_leds(scheduled + LedRing::PERIOD.cycles()).unwrap();
+                schedule
+                    .accel_leds(scheduled + LedRing::PERIOD.cycles())
+                    .unwrap();
             }
         })
     }

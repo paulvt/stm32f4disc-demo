@@ -22,7 +22,7 @@ impl Direction {
 pub enum Mode {
     Off,
     Cycle,
-    Accelerometer
+    Accelerometer,
 }
 
 pub struct LedRing {
