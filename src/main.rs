@@ -1,3 +1,8 @@
+//! STM32F4DISCOVERY demo application
+//!
+//! This demo application sports a serial command-interface for controlling what the LED
+//! ring does: cycle clock-wise, counter clock-wise, or follow the accelerometer.
+
 #![deny(unsafe_code)]
 #![deny(warnings)]
 #![no_main]
@@ -40,9 +45,11 @@ const APP: () = {
     static mut accel: Accelerometer = ();
     static mut accel_cs: AccelerometerCs = ();
 
+    /// Initializes the application by setting up the LED ring, user button, serial
+    /// interface and accelerometer.
     #[init(spawn = [accel_leds, cycle_leds])]
     fn init() -> init::LateResources {
-        // Set up the LED ring and spawn the LEDs switch task.
+        // Set up the LED ring and spawn the task corresponding to the mode.
         let gpiod = device.GPIOD.split();
         let leds = [
             gpiod.pd12.into_push_pull_output().downgrade(),
@@ -110,6 +117,7 @@ const APP: () = {
         }
     }
 
+    /// Task that advances the LED ring one step and schedules the next trigger (if enabled).
     #[task(schedule = [cycle_leds], resources = [led_ring])]
     fn cycle_leds() {
         resources.led_ring.lock(|led_ring| {
@@ -122,6 +130,8 @@ const APP: () = {
         });
     }
 
+    /// Task that performs an accelerometers measurement and adjusts the LED ring accordingly
+    /// and schedules the next trigger (if enabled).
     #[task(schedule = [accel_leds], resources = [accel, accel_cs, led_ring, serial_tx])]
     fn accel_leds() {
         resources.accel_cs.set_low();
@@ -149,6 +159,8 @@ const APP: () = {
         })
     }
 
+    /// Interrupt handler that writes that the button is pressed to the serial interface
+    /// and reverses the LED ring cycle direction.
     #[interrupt(binds = EXTI0, resources = [button, exti, led_ring, serial_tx])]
     fn button_pressed() {
         resources.led_ring.lock(|led_ring| led_ring.reverse());
@@ -161,6 +173,8 @@ const APP: () = {
         resources.button.clear_interrupt_pending_bit(resources.exti);
     }
 
+    /// Interrupt handler that reads data from the serial connection and handles commands
+    /// once an appropriate command is in the buffer.
     #[interrupt(
         binds = USART2,
         priority = 2,
