@@ -8,21 +8,21 @@
 #![no_main]
 #![no_std]
 
-extern crate panic_semihosting;
-
 mod led_ring;
 
 use crate::led_ring::{Led, LedRing};
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
-use hal::block;
-use hal::gpio::{Alternate, Edge, ExtiPin, Floating, Input, Output, PushPull, AF5};
-use hal::prelude::*;
-use hal::serial::{self, config::Config as SerialConfig, Serial};
-use hal::spi::{Mode, Phase, Polarity, Spi};
-use hal::stm32::{EXTI, SPI1, USART2};
-use heapless::consts::U8;
-use heapless::Vec;
+use hal::{
+    block,
+    gpio::{Alternate, Edge, ExtiPin, Floating, Input, Output, PushPull, AF5},
+    prelude::*,
+    serial::{self, config::Config as SerialConfig, Serial},
+    spi::{Mode, Phase, Polarity, Spi},
+    stm32::{EXTI, SPI1, USART2},
+};
+use heapless::{consts::U8, Vec};
+use panic_semihosting as _;
 use rtfm::app;
 
 type Accelerometer = hal::spi::Spi<SPI1, (Spi1Sck, Spi1Miso, Spi1Mosi)>;
