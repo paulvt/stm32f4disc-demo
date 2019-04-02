@@ -1,6 +1,16 @@
 # Use Rust docker image, see: https://hub.docker.com/_/rust/
 image: rust:latest
 
+# Set the Cargo dir manually so it can be cached
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/cargo
+
+# Cache the Cargo dir and build artifacts
+cache:
+ paths:
+   - cargo/
+   - target/
+
 # Add the thumbv7em-none-eabihf target for Rust
 before_script:
   - rustup target add thumbv7em-none-eabihf
