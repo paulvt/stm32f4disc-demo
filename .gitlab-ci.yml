@@ -1,5 +1,9 @@
 # Use Rust docker image, see: https://hub.docker.com/_/rust/
-image: arm32v7/rust:latest
+image: rust:latest
+
+# Add the thumbv7em-none-eabihf target for Rust
+before_script:
+  - rustup target add thumbv7em-none-eabihf
 
 # Defines stages which are to be executed
 stages:
