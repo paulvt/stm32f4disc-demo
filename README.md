@@ -1,7 +1,7 @@
 stm32f4disc-demo
 ================
 
-This is some STM32F4DISCOVERY demo application.
+This is just some STM32F4DISCOVERY demo application using Rust.
 It a serial command-interface for controlling (via GPIO) what the LED
 ring does: cycle clock-wise, counter clock-wise, or follow the accelerometer.
 The accelerometer is accessed via SPI.
@@ -9,9 +9,9 @@ The accelerometer is accessed via SPI.
 Serial interface
 ----------------
 
-The serial interface configured on USART 2 can be accessed using, for example,
-an USB-to-serial cable connected to a ground pin, and RX to PA2 and TX to
-PA3.
+The serial interface is configured on USART 2 and can be accessed using, for
+example, an USB-to-serial cable connected to a ground pin, and RX to PA2 and TX
+to PA3.
 
 The interface will output the following lines:
 
