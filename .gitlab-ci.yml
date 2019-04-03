@@ -7,9 +7,9 @@ variables:
 
 # Cache the Cargo dir and build artifacts
 cache:
- paths:
-   - cargo/
-   - target/
+  paths:
+    - cargo/
+    - target/
 
 # Add the thumbv7em-none-eabihf target for Rust
 before_script:
@@ -19,10 +19,11 @@ before_script:
 stages:
   - build
 
-# Run `cargo build` for the project with stable Rust
+# Run `cargo build` and `cargo test for the project with stable Rust
 rust-build:
   stage: build
   image: rust:latest
   script:
   - rustc --version && cargo --version
   - cargo build --release --jobs 1
+  - env RUSTDOCFLAGS=-Cpanic=abort cargo test -- --test-threads 1
