@@ -128,9 +128,7 @@ const APP: () = {
         resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_cycle() {
                 led_ring.advance();
-                schedule
-                    .cycle_leds(scheduled + PERIOD.cycles())
-                    .unwrap();
+                schedule.cycle_leds(scheduled + PERIOD.cycles()).unwrap();
             }
         });
     }
@@ -157,9 +155,7 @@ const APP: () = {
             if led_ring.is_mode_accel() {
                 let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
                 led_ring.specific_on(directions);
-                schedule
-                    .accel_leds(scheduled + PERIOD.cycles())
-                    .unwrap();
+                schedule.accel_leds(scheduled + PERIOD.cycles()).unwrap();
             }
         })
     }
