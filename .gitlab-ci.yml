@@ -26,4 +26,6 @@ rust-build:
   script:
   - rustc --version && cargo --version
   - cargo build --release --jobs 1
+  # FIXME: These should be run on the x86_64-unknown-linux-gnu target,
+  # does nothing otherwise
   - env RUSTDOCFLAGS=-Cpanic=abort cargo test -- --test-threads 1

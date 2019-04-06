@@ -155,3 +155,124 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Direction, LedRing, Mode, OutputPin};
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct MockOutputPin {
+        state: bool,
+    }
+
+    impl OutputPin for MockOutputPin {
+        fn set_high(&mut self) {
+            self.state = true;
+        }
+
+        fn set_low(&mut self) {
+            self.state = false;
+        }
+    }
+
+    macro_rules! assert_pins {
+        ($pins:expr, [$pin0:expr, $pin1:expr, $pin2:expr, $pin3:expr]) => {{
+            assert_eq!($pins[0].state, $pin0);
+            assert_eq!($pins[1].state, $pin1);
+            assert_eq!($pins[2].state, $pin2);
+            assert_eq!($pins[3].state, $pin3);
+        }}
+    }
+
+    #[test]
+    fn direction_flip() {
+        let cw_dir = Direction::Clockwise;
+        assert_eq!(cw_dir.flip(), Direction::CounterClockwise);
+        let ccw_dir = Direction::CounterClockwise;
+        assert_eq!(ccw_dir.flip(), Direction::Clockwise);
+    }
+
+    #[test]
+    fn led_ring_init() {
+        let mock_leds = [MockOutputPin { state: false }; 4];
+        let led_ring = LedRing::<MockOutputPin>::from(mock_leds);
+
+        assert_eq!(led_ring.direction(), Direction::Clockwise);
+        assert_eq!(led_ring.mode(), Mode::Cycle);
+    }
+
+    #[test]
+    fn led_ring_mode() {
+        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
+
+        led_ring.enable_accel();
+        assert_eq!(led_ring.mode(), Mode::Accelerometer);
+        assert!(led_ring.is_mode_accel());
+        assert!(!led_ring.is_mode_cycle());
+
+        led_ring.disable();
+        assert_eq!(led_ring.mode(), Mode::Off);
+        assert!(!led_ring.is_mode_accel());
+        assert!(!led_ring.is_mode_cycle());
+
+        led_ring.enable_cycle();
+        assert_eq!(led_ring.mode(), Mode::Cycle);
+        assert!(!led_ring.is_mode_accel());
+        assert!(led_ring.is_mode_cycle());
+    }
+
+    #[test]
+    fn led_ring_direction() {
+        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
+
+        led_ring.reverse();
+        assert_eq!(led_ring.direction(), Direction::CounterClockwise);
+
+        led_ring.reverse();
+        assert_eq!(led_ring.direction(), Direction::Clockwise);
+    }
+
+    #[test]
+    fn led_ring_advance() {
+        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
+
+        assert_pins!(mock_leds, [false, false, false, false]);
+        led_ring.advance();
+        assert_pins!(mock_leds, [true, false, false, false]);
+        led_ring.advance();
+        assert_pins!(mock_leds, [true, true, false, false]);
+        led_ring.advance();
+        assert_pins!(mock_leds, [false, true, true, false]);
+        led_ring.advance();
+        assert_pins!(mock_leds, [false, false, true, true]);
+        led_ring.advance();
+        assert_pins!(mock_leds, [true, false, false, true]);
+        led_ring.advance();
+        assert_pins!(mock_leds, [true, true, false, false]);
+    }
+
+    #[test]
+    fn led_ring_all_on_off() {
+        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
+
+        assert_pins!(mock_leds, [false, false, false, false]);
+        led_ring.all_on();
+        assert_pins!(mock_leds, [true, true, true, true]);
+        led_ring.all_off();
+        assert_pins!(mock_leds, [false, false, false, false]);
+    }
+
+    #[test]
+    fn led_ring_specific_on() {
+        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
+
+        assert_pins!(mock_leds, [false, false, false, false]);
+        led_ring.specific_on([true, false, true, false]);
+        assert_pins!(mock_leds, [true, false, true, false]);
+    }
+}
