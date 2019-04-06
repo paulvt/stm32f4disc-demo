@@ -22,6 +22,7 @@ use hal::{
     stm32::{EXTI, SPI1, USART2},
 };
 use heapless::{consts::U8, Vec};
+#[cfg(not(test))]
 use panic_semihosting as _;
 use rtfm::app;
 

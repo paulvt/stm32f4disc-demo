@@ -8,13 +8,13 @@
 #![no_main]
 #![no_std]
 
-extern crate panic_semihosting;
-
 use cortex_m_rt::entry;
 //use cortex_m_semihosting::hprintln;
 use hal::block;
 use hal::prelude::*;
 use hal::serial::{config::Config as SerialConfig, Serial};
+#[cfg(not(test))]
+use panic_semihosting as _;
 
 #[entry]
 fn main() -> ! {
