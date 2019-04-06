@@ -1,5 +1,6 @@
 //! Module for manipulating the LED ring.
 
+use hal::prelude::_embedded_hal_digital_OutputPin as OutputPin;
 
 /// The cycle direction of the LED ring.
 ///
@@ -36,9 +37,9 @@ pub enum Mode {
 
 /// The LED ring.
 ///
-/// The ring on this board is comprised of four LEDs.  This struct provides methods
+/// The ring on this board is comprised of four LEDs (output pins).  This struct provides methods
 /// for animating them.
-pub struct LedRing {
+pub struct LedRing<LED> {
     /// The current cycle direction.
     direction: Direction,
     /// The current mode.
@@ -46,12 +47,15 @@ pub struct LedRing {
     /// The index of the current LED being lit.
     index: usize,
     /// The LED outputs being used to comprise the LED ring.
-    leds: [crate::Led; 4],
+    leds: [LED; 4],
 }
 
-impl LedRing {
+impl<LED> LedRing<LED>
+where
+    LED: OutputPin,
+{
     /// Sets up the LED ring using using four LED GPIO outputs.
-    pub fn from(leds: [Led; 4]) -> LedRing {
+    pub fn from(leds: [LED; 4]) -> LedRing<LED> {
         LedRing {
             direction: Direction::Clockwise,
             mode: Mode::Cycle,
