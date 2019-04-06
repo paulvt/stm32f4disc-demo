@@ -6,7 +6,7 @@ use hal::prelude::_embedded_hal_digital_OutputPin as OutputPin;
 ///
 /// The direction can be interpreted as such when the mini-USB port of the board is being held
 /// down.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Direction {
     /// Cycle clockwise.
     Clockwise,
@@ -25,7 +25,7 @@ impl Direction {
 }
 
 /// The mode the LED ring is in.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
     /// All LEDs are off.
     Off,
@@ -64,6 +64,11 @@ where
         }
     }
 
+    /// Returns the current cycle mode.
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
     /// Enables cycle mode.
     pub fn enable_cycle(&mut self) {
         self.mode = Mode::Cycle;
@@ -87,6 +92,11 @@ where
     /// Returns whether the LED ring is in acceleromter mode.
     pub fn is_mode_accel(&self) -> bool {
         self.mode == Mode::Accelerometer
+    }
+
+    /// Returns the current cycle direction.
+    pub fn direction(&self) -> Direction {
+        self.direction
     }
 
     /// Reverses the cycle direction.
