@@ -10,7 +10,7 @@
 
 mod led_ring;
 
-use crate::led_ring::{Led, LedRing};
+use crate::led_ring::LedRing;
 use core::fmt::Write;
 use cortex_m_semihosting::hprintln;
 use hal::{
@@ -28,6 +28,7 @@ use rtfm::app;
 
 type Accelerometer = hal::spi::Spi<SPI1, (Spi1Sck, Spi1Miso, Spi1Mosi)>;
 type AccelerometerCs = hal::gpio::gpioe::PE3<Output<PushPull>>;
+type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
 type SerialTx = hal::serial::Tx<USART2>;
 type SerialRx = hal::serial::Rx<USART2>;
 type Spi1Sck = hal::gpio::gpioa::PA5<Alternate<AF5>>;
@@ -35,11 +36,14 @@ type Spi1Miso = hal::gpio::gpioa::PA6<Alternate<AF5>>;
 type Spi1Mosi = hal::gpio::gpioa::PA7<Alternate<AF5>>;
 type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
 
+/// The number of cycles between LED ring updates (used by tasks).
+const PERIOD: u32 = 8_000_000;
+
 #[app(device = hal::stm32)]
 const APP: () = {
     static mut button: UserButton = ();
     static mut buffer: Vec<u8, U8> = ();
-    static mut led_ring: LedRing = ();
+    static mut led_ring: LedRing<Led> = ();
     static mut exti: EXTI = ();
     static mut serial_rx: SerialRx = ();
     static mut serial_tx: SerialTx = ();
@@ -125,7 +129,7 @@ const APP: () = {
             if led_ring.is_mode_cycle() {
                 led_ring.advance();
                 schedule
-                    .cycle_leds(scheduled + LedRing::PERIOD.cycles())
+                    .cycle_leds(scheduled + PERIOD.cycles())
                     .unwrap();
             }
         });
@@ -154,7 +158,7 @@ const APP: () = {
                 let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
                 led_ring.specific_on(directions);
                 schedule
-                    .accel_leds(scheduled + LedRing::PERIOD.cycles())
+                    .accel_leds(scheduled + PERIOD.cycles())
                     .unwrap();
             }
         })

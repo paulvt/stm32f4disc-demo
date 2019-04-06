@@ -1,12 +1,7 @@
 //! Module for manipulating the LED ring.
 
-use hal::gpio::{Output, PushPull};
-use hal::prelude::*;
 
-/// Type alias for a generic LED output.
-pub type Led = hal::gpio::gpiod::PD<Output<PushPull>>;
-
-/// The cycle direction of the LED ring
+/// The cycle direction of the LED ring.
 ///
 /// The direction can be interpreted as such when the mini-USB port of the board is being held
 /// down.
@@ -55,9 +50,6 @@ pub struct LedRing {
 }
 
 impl LedRing {
-    /// The number of cycles between LED ring updates (used by tasks).
-    pub const PERIOD: u32 = 8_000_000;
-
     /// Sets up the LED ring using using four LED GPIO outputs.
     pub fn from(leds: [Led; 4]) -> LedRing {
         LedRing {
