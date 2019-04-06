@@ -151,7 +151,7 @@ const APP: () = {
         resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_accel() {
                 let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
-                led_ring.set_directions(directions);
+                led_ring.specific_on(directions);
                 schedule
                     .accel_leds(scheduled + LedRing::PERIOD.cycles())
                     .unwrap();

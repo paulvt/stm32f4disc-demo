@@ -135,11 +135,11 @@ impl LedRing {
         }
     }
 
-    /// Turns on specific LEDs based on the direction array.
+    /// Turns on specific LEDs based on the "direction" array.
     ///
     /// When looking with the mini-USB port of the board held down (south), the directions of
     /// the array can be interpreted as: `[east, south, west, north]`.
-    pub fn set_directions(&mut self, directions: [bool; 4]) {
+    pub fn specific_on(&mut self, directions: [bool; 4]) {
         for (led, on_off) in self.leds.iter_mut().zip(directions.iter()) {
             if *on_off {
                 led.set_high();
