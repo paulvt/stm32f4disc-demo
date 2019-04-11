@@ -24,6 +24,10 @@ package = "stm32f4xx-hal"
 version = "0.3.0"
 features = ["rt", "stm32f407"]
 
+[lib]
+name = "stm32f4disc_demo"
+path = "src/lib.rs"
+
 [[bin]]
 name = "stm32f4disc-demo"
 test = false

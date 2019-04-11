@@ -8,10 +8,8 @@
 #![no_main]
 #![no_std]
 
-mod led_ring;
-
-use crate::led_ring::LedRing;
 use core::fmt::Write;
+
 use cortex_m_semihosting::hprintln;
 use hal::{
     block,
@@ -25,6 +23,7 @@ use heapless::{consts::U8, Vec};
 #[cfg(not(test))]
 use panic_semihosting as _;
 use rtfm::app;
+use stm32f4disc_demo::led_ring::LedRing;
 
 type Accelerometer = hal::spi::Spi<SPI1, (Spi1Sck, Spi1Miso, Spi1Mosi)>;
 type AccelerometerCs = hal::gpio::gpioe::PE3<Output<PushPull>>;
