@@ -2,9 +2,11 @@ stm32f4disc-demo
 ================
 
 This is just some STM32F4DISCOVERY demo application using Rust.
-It a serial command-interface for controlling (via GPIO) what the LED
-ring does: cycle clock-wise, counter clock-wise, or follow the accelerometer.
-The accelerometer is accessed via SPI.
+It has a simple serial command-interface for controlling (via GPIO) what the
+LED ring does: cycle clock-wise, counter clock-wise, or follow the
+accelerometer.  The accelerometer is accessed via SPI.
+
+The project also shows how to do unit testing and how to use GitLab CI.
 
 Serial interface
 ----------------
