@@ -154,15 +154,32 @@ where
             }
         }
     }
+
+    /// Provides access to the LEDs (for testing purposes only).
+    #[cfg(test)]
+    pub fn leds_mut(&self) -> &[LED; 4] {
+        &self.leds
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Direction, LedRing, Mode, OutputPin};
 
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[derive(Debug, Eq, PartialEq)]
     struct MockOutputPin {
         state: bool,
+    }
+
+    impl MockOutputPin {
+        fn get_4() -> [Self; 4] {
+            [
+                Self { state: false },
+                Self { state: false },
+                Self { state: false },
+                Self { state: false },
+            ]
+        }
     }
 
     impl OutputPin for MockOutputPin {
@@ -177,11 +194,11 @@ mod tests {
 
     macro_rules! assert_pins {
         ($pins:expr, [$pin0:expr, $pin1:expr, $pin2:expr, $pin3:expr]) => {{
-            assert_eq!($pins[0].state, $pin0);
-            assert_eq!($pins[1].state, $pin1);
-            assert_eq!($pins[2].state, $pin2);
-            assert_eq!($pins[3].state, $pin3);
-        }}
+            assert_eq!($pins[0].state, $pin0, "(mock pin 0)");
+            assert_eq!($pins[1].state, $pin1, "(mock pin 1)");
+            assert_eq!($pins[2].state, $pin2, "(mock pin 2)");
+            assert_eq!($pins[3].state, $pin3, "(mock pin 3)");
+        }};
     }
 
     #[test]
@@ -194,7 +211,7 @@ mod tests {
 
     #[test]
     fn led_ring_init() {
-        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mock_leds = MockOutputPin::get_4();
         let led_ring = LedRing::<MockOutputPin>::from(mock_leds);
 
         assert_eq!(led_ring.direction(), Direction::Clockwise);
@@ -203,7 +220,7 @@ mod tests {
 
     #[test]
     fn led_ring_mode() {
-        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mock_leds = MockOutputPin::get_4();
         let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
 
         led_ring.enable_accel();
@@ -224,7 +241,7 @@ mod tests {
 
     #[test]
     fn led_ring_direction() {
-        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mock_leds = MockOutputPin::get_4();
         let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
 
         led_ring.reverse();
@@ -236,43 +253,44 @@ mod tests {
 
     #[test]
     fn led_ring_advance() {
-        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mock_leds = MockOutputPin::get_4();
         let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
 
-        assert_pins!(mock_leds, [false, false, false, false]);
+        assert_pins!(led_ring.leds_mut(), [false, false, false, false]);
         led_ring.advance();
-        assert_pins!(mock_leds, [true, false, false, false]);
+        assert_pins!(led_ring.leds_mut(), [true, false, false, false]);
         led_ring.advance();
-        assert_pins!(mock_leds, [true, true, false, false]);
+        assert_pins!(led_ring.leds_mut(), [true, true, false, false]);
         led_ring.advance();
-        assert_pins!(mock_leds, [false, true, true, false]);
+        assert_pins!(led_ring.leds_mut(), [false, true, true, false]);
         led_ring.advance();
-        assert_pins!(mock_leds, [false, false, true, true]);
+        assert_pins!(led_ring.leds_mut(), [false, false, true, true]);
         led_ring.advance();
-        assert_pins!(mock_leds, [true, false, false, true]);
+        assert_pins!(led_ring.leds_mut(), [true, false, false, true]);
         led_ring.advance();
-        assert_pins!(mock_leds, [true, true, false, false]);
+        assert_pins!(led_ring.leds_mut(), [true, true, false, false]);
+        led_ring.advance();
     }
 
     #[test]
     fn led_ring_all_on_off() {
-        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mock_leds = MockOutputPin::get_4();
         let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
 
-        assert_pins!(mock_leds, [false, false, false, false]);
+        assert_pins!(led_ring.leds_mut(), [false, false, false, false]);
         led_ring.all_on();
-        assert_pins!(mock_leds, [true, true, true, true]);
+        assert_pins!(led_ring.leds_mut(), [true, true, true, true]);
         led_ring.all_off();
-        assert_pins!(mock_leds, [false, false, false, false]);
+        assert_pins!(led_ring.leds_mut(), [false, false, false, false]);
     }
 
     #[test]
     fn led_ring_specific_on() {
-        let mock_leds = [MockOutputPin { state: false }; 4];
+        let mock_leds = MockOutputPin::get_4();
         let mut led_ring = LedRing::<MockOutputPin>::from(mock_leds);
 
-        assert_pins!(mock_leds, [false, false, false, false]);
+        assert_pins!(led_ring.leds_mut(), [false, false, false, false]);
         led_ring.specific_on([true, false, true, false]);
-        assert_pins!(mock_leds, [true, false, true, false]);
+        assert_pins!(led_ring.leds_mut(), [true, false, true, false]);
     }
 }
