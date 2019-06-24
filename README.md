@@ -21,7 +21,7 @@ The interface will output the following lines:
 * `button` when the user button has been pressed
 * `level` when the board is being held in a perfect level position (when in
    acceleration mode)
-   
+
 The following lines can be given as commands:
 
 * `on` to turn all the leds on (and disable accelerometer/cycle mode)
