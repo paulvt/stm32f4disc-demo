@@ -40,14 +40,14 @@ const PERIOD: u32 = 8_000_000;
 
 #[app(device = hal::stm32)]
 const APP: () = {
-    static mut button: UserButton = ();
-    static mut buffer: Vec<u8, U8> = ();
-    static mut led_ring: LedRing<Led> = ();
-    static mut exti: EXTI = ();
-    static mut serial_rx: SerialRx = ();
-    static mut serial_tx: SerialTx = ();
-    static mut accel: Accelerometer = ();
-    static mut accel_cs: AccelerometerCs = ();
+    static mut ACCEL: Accelerometer = ();
+    static mut ACCEL_CS: AccelerometerCs = ();
+    static mut BUFFER: Vec<u8, U8> = ();
+    static mut BUTTON: UserButton = ();
+    static mut EXTI_CNTR: EXTI = ();
+    static mut LED_RING: LedRing<Led> = ();
+    static mut SERIAL_RX: SerialRx = ();
+    static mut SERIAL_TX: SerialTx = ();
 
     /// Initializes the application by setting up the LED ring, user button, serial
     /// interface and accelerometer.
@@ -69,11 +69,11 @@ const APP: () = {
         }
 
         // Set up the EXTI0 interrupt for the user button.
-        let mut exti = device.EXTI;
+        let mut exti_cntr = device.EXTI;
         let gpioa = device.GPIOA.split();
         let mut button = gpioa.pa0.into_floating_input();
-        button.enable_interrupt(&mut exti);
-        button.trigger_on_edge(&mut exti, Edge::RISING);
+        button.enable_interrupt(&mut exti_cntr);
+        button.trigger_on_edge(&mut exti_cntr, Edge::RISING);
 
         // Set up the serial interface and the USART2 interrupt.
         let tx = gpioa.pa2.into_alternate_af7();
@@ -110,21 +110,21 @@ const APP: () = {
         writeln!(serial_tx, "init\r").unwrap();
 
         init::LateResources {
-            button,
-            buffer,
-            exti,
-            led_ring,
-            serial_tx,
-            serial_rx,
-            accel,
-            accel_cs,
+            ACCEL: accel,
+            ACCEL_CS: accel_cs,
+            BUFFER: buffer,
+            BUTTON: button,
+            EXTI_CNTR: exti_cntr,
+            LED_RING: led_ring,
+            SERIAL_RX: serial_rx,
+            SERIAL_TX: serial_tx,
         }
     }
 
     /// Task that advances the LED ring one step and schedules the next trigger (if enabled).
-    #[task(schedule = [cycle_leds], resources = [led_ring])]
+    #[task(schedule = [cycle_leds], resources = [LED_RING])]
     fn cycle_leds() {
-        resources.led_ring.lock(|led_ring| {
+        resources.LED_RING.lock(|led_ring| {
             if led_ring.is_mode_cycle() {
                 led_ring.advance();
                 schedule.cycle_leds(scheduled + PERIOD.cycles()).unwrap();
@@ -134,23 +134,23 @@ const APP: () = {
 
     /// Task that performs an accelerometers measurement and adjusts the LED ring accordingly
     /// and schedules the next trigger (if enabled).
-    #[task(schedule = [accel_leds], resources = [accel, accel_cs, led_ring, serial_tx])]
+    #[task(schedule = [accel_leds], resources = [ACCEL, ACCEL_CS, LED_RING, SERIAL_TX])]
     fn accel_leds() {
-        resources.accel_cs.set_low();
+        resources.ACCEL_CS.set_low();
         let read_command = (1 << 7) | (1 << 6) | 0x29;
         let mut commands = [read_command, 0x0, 0x0, 0x0];
-        let result = resources.accel.transfer(&mut commands[..]).unwrap();
+        let result = resources.ACCEL.transfer(&mut commands[..]).unwrap();
         let acc_x = result[1] as i8;
         let acc_y = result[3] as i8;
-        resources.accel_cs.set_high();
+        resources.ACCEL_CS.set_high();
 
         if acc_x == 0 && acc_y == 0 {
             resources
-                .serial_tx
+                .SERIAL_TX
                 .lock(|serial_tx| writeln!(serial_tx, "level\r").unwrap());
         }
 
-        resources.led_ring.lock(|led_ring| {
+        resources.LED_RING.lock(|led_ring| {
             if led_ring.is_mode_accel() {
                 let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
                 led_ring.specific_on(directions);
@@ -161,16 +161,18 @@ const APP: () = {
 
     /// Interrupt handler that writes that the button is pressed to the serial interface
     /// and reverses the LED ring cycle direction.
-    #[interrupt(binds = EXTI0, resources = [button, exti, led_ring, serial_tx])]
+    #[interrupt(binds = EXTI0, resources = [BUTTON, EXTI_CNTR, LED_RING, SERIAL_TX])]
     fn button_pressed() {
-        resources.led_ring.lock(|led_ring| led_ring.reverse());
+        resources.LED_RING.lock(|led_ring| led_ring.reverse());
 
         // Write the fact that the button has been pressed to the serial port.
         resources
-            .serial_tx
+            .SERIAL_TX
             .lock(|serial_tx| writeln!(serial_tx, "button\r").unwrap());
 
-        resources.button.clear_interrupt_pending_bit(resources.exti);
+        resources
+            .BUTTON
+            .clear_interrupt_pending_bit(resources.EXTI_CNTR);
     }
 
     /// Interrupt handler that reads data from the serial connection and handles commands
@@ -178,55 +180,55 @@ const APP: () = {
     #[interrupt(
         binds = USART2,
         priority = 2,
-        resources = [buffer, led_ring, serial_rx, serial_tx],
+        resources = [BUFFER, LED_RING, SERIAL_RX, SERIAL_TX],
         spawn = [accel_leds, cycle_leds]
     )]
     fn handle_serial() {
-        let buffer = resources.buffer;
+        let buffer = resources.BUFFER;
 
         // Read a byte from the serial port and write it back.
-        let byte = resources.serial_rx.read().unwrap();
-        block!(resources.serial_tx.write(byte)).unwrap();
+        let byte = resources.SERIAL_RX.read().unwrap();
+        block!(resources.SERIAL_TX.write(byte)).unwrap();
         //hprintln!("serial: {}", byte).unwrap();
 
         // Handle the command in the buffer for newline or backspace, otherwise append to the
         // buffer.
         if byte == b'\r' {
-            block!(resources.serial_tx.write(b'\n')).unwrap();
+            block!(resources.SERIAL_TX.write(b'\n')).unwrap();
             match &buffer[..] {
                 b"flip" => {
-                    resources.led_ring.reverse();
+                    resources.LED_RING.reverse();
                 }
                 b"stop" => {
-                    resources.led_ring.disable();
+                    resources.LED_RING.disable();
                 }
                 b"cycle" => {
-                    resources.led_ring.enable_cycle();
+                    resources.LED_RING.enable_cycle();
                     spawn.cycle_leds().unwrap();
                 }
                 b"accel" => {
-                    resources.led_ring.enable_accel();
+                    resources.LED_RING.enable_accel();
                     spawn.accel_leds().unwrap();
                 }
                 b"off" => {
-                    resources.led_ring.disable();
-                    resources.led_ring.all_off();
+                    resources.LED_RING.disable();
+                    resources.LED_RING.all_off();
                 }
                 b"on" => {
-                    resources.led_ring.disable();
-                    resources.led_ring.all_on();
+                    resources.LED_RING.disable();
+                    resources.LED_RING.all_on();
                 }
                 _ => {
-                    writeln!(resources.serial_tx, "?\r").unwrap();
+                    writeln!(resources.SERIAL_TX, "?\r").unwrap();
                 }
             }
 
             buffer.clear();
         } else if byte == 0x7F {
             buffer.pop();
-            block!(resources.serial_tx.write(b'\r')).unwrap();
+            block!(resources.SERIAL_TX.write(b'\r')).unwrap();
             for byte in buffer {
-                block!(resources.serial_tx.write(*byte)).unwrap();
+                block!(resources.SERIAL_TX.write(*byte)).unwrap();
             }
         } else {
             if buffer.push(byte).is_err() {
