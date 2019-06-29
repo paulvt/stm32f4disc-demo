@@ -4,7 +4,6 @@
 //! example with serial terminal emulator like `minicom`.
 
 #![deny(unsafe_code)]
-#![deny(warnings)]
 #![no_main]
 #![no_std]
 

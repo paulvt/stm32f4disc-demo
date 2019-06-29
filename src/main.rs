@@ -4,7 +4,6 @@
 //! ring does: cycle clock-wise, counter clock-wise, or follow the accelerometer.
 
 #![deny(unsafe_code)]
-#![deny(warnings)]
 #![no_main]
 #![no_std]
 
