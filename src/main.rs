@@ -22,6 +22,7 @@ use heapless::{consts::U8, Vec};
 #[cfg(not(test))]
 use panic_semihosting as _;
 use rtfm::app;
+use rtfm::cyccnt::{Instant, U32Ext};
 use stm32f4disc_demo::led_ring::LedRing;
 
 type Accelerometer = hal::spi::Spi<SPI1, (Spi1Sck, Spi1Miso, Spi1Mosi)>;
@@ -37,23 +38,29 @@ type UserButton = hal::gpio::gpioa::PA0<Input<Floating>>;
 /// The number of cycles between LED ring updates (used by tasks).
 const PERIOD: u32 = 8_000_000;
 
-#[app(device = hal::stm32)]
+#[app(device = hal::stm32, monotonic = rtfm::cyccnt::CYCCNT, peripherals = true)]
 const APP: () = {
-    static mut ACCEL: Accelerometer = ();
-    static mut ACCEL_CS: AccelerometerCs = ();
-    static mut BUFFER: Vec<u8, U8> = ();
-    static mut BUTTON: UserButton = ();
-    static mut EXTI_CNTR: EXTI = ();
-    static mut LED_RING: LedRing<Led> = ();
-    static mut SERIAL_RX: SerialRx = ();
-    static mut SERIAL_TX: SerialTx = ();
+    struct Resources {
+        accel: Accelerometer,
+        accel_cs: AccelerometerCs,
+        buffer: Vec<u8, U8>,
+        button: UserButton,
+        exit_cntr: EXTI,
+        led_ring: LedRing<Led>,
+        serial_rx: SerialRx,
+        serial_tx: SerialTx,
+    }
 
     /// Initializes the application by setting up the LED ring, user button, serial
     /// interface and accelerometer.
     #[init(spawn = [accel_leds, cycle_leds])]
-    fn init() -> init::LateResources {
+    fn init(mut cx: init::Context) -> init::LateResources {
+        // Set up and enable the monotonic timer.
+        cx.core.DCB.enable_trace();
+        cx.core.DWT.enable_cycle_counter();
+
         // Set up the LED ring and spawn the task corresponding to the mode.
-        let gpiod = device.GPIOD.split();
+        let gpiod = cx.device.GPIOD.split();
         let leds = [
             gpiod.pd12.into_push_pull_output().downgrade(),
             gpiod.pd13.into_push_pull_output().downgrade(),
@@ -62,14 +69,14 @@ const APP: () = {
         ];
         let led_ring = LedRing::from(leds);
         if led_ring.is_mode_cycle() {
-            spawn.cycle_leds().unwrap();
+            cx.spawn.cycle_leds().unwrap();
         } else if led_ring.is_mode_accel() {
-            spawn.accel_leds().unwrap();
+            cx.spawn.accel_leds().unwrap();
         }
 
         // Set up the EXTI0 interrupt for the user button.
-        let mut exti_cntr = device.EXTI;
-        let gpioa = device.GPIOA.split();
+        let mut exti_cntr = cx.device.EXTI;
+        let gpioa = cx.device.GPIOA.split();
         let mut button = gpioa.pa0.into_floating_input();
         button.enable_interrupt(&mut exti_cntr);
         button.trigger_on_edge(&mut exti_cntr, Edge::RISING);
@@ -78,9 +85,9 @@ const APP: () = {
         let tx = gpioa.pa2.into_alternate_af7();
         let rx = gpioa.pa3.into_alternate_af7();
         let config = SerialConfig::default().baudrate(115_200.bps());
-        let rcc = device.RCC.constrain();
+        let rcc = cx.device.RCC.constrain();
         let clocks = rcc.cfgr.freeze();
-        let mut serial = Serial::usart2(device.USART2, (tx, rx), config, clocks).unwrap();
+        let mut serial = Serial::usart2(cx.device.USART2, (tx, rx), config, clocks).unwrap();
         serial.listen(serial::Event::Rxne);
         let (mut serial_tx, serial_rx) = serial.split();
 
@@ -95,9 +102,9 @@ const APP: () = {
             polarity: Polarity::IdleHigh,
             phase: Phase::CaptureOnSecondTransition,
         };
-        let mut accel = Spi::spi1(device.SPI1, (sck, miso, mosi), mode, 100.hz(), clocks);
+        let mut accel = Spi::spi1(cx.device.SPI1, (sck, miso, mosi), mode, 100.hz(), clocks);
 
-        let gpioe = device.GPIOE.split();
+        let gpioe = cx.device.GPIOE.split();
         let mut accel_cs = gpioe.pe3.into_push_pull_output();
 
         // Initialize the accelerometer.
@@ -109,125 +116,141 @@ const APP: () = {
         writeln!(serial_tx, "init\r").unwrap();
 
         init::LateResources {
-            ACCEL: accel,
-            ACCEL_CS: accel_cs,
-            BUFFER: buffer,
-            BUTTON: button,
-            EXTI_CNTR: exti_cntr,
-            LED_RING: led_ring,
-            SERIAL_RX: serial_rx,
-            SERIAL_TX: serial_tx,
+            accel: accel,
+            accel_cs: accel_cs,
+            buffer: buffer,
+            button: button,
+            exit_cntr: exti_cntr,
+            led_ring: led_ring,
+            serial_rx: serial_rx,
+            serial_tx: serial_tx,
         }
     }
 
     /// Task that advances the LED ring one step and schedules the next trigger (if enabled).
-    #[task(schedule = [cycle_leds], resources = [LED_RING])]
-    fn cycle_leds() {
-        resources.LED_RING.lock(|led_ring| {
+    #[task(schedule = [cycle_leds], resources = [led_ring])]
+    fn cycle_leds(mut cx: cycle_leds::Context) {
+        let reschedule = cx.resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_cycle() {
                 led_ring.advance();
-                schedule.cycle_leds(scheduled + PERIOD.cycles()).unwrap();
+                true
+            } else {
+                false
             }
         });
+
+        if reschedule {
+            cx.schedule
+                .cycle_leds(Instant::now() + PERIOD.cycles())
+                .unwrap();
+        }
     }
 
     /// Task that performs an accelerometers measurement and adjusts the LED ring accordingly
     /// and schedules the next trigger (if enabled).
-    #[task(schedule = [accel_leds], resources = [ACCEL, ACCEL_CS, LED_RING, SERIAL_TX])]
-    fn accel_leds() {
-        resources.ACCEL_CS.set_low();
+    #[task(schedule = [accel_leds], resources = [accel, accel_cs, led_ring, serial_tx])]
+    fn accel_leds(mut cx: accel_leds::Context) {
+        cx.resources.accel_cs.set_low();
         let read_command = (1 << 7) | (1 << 6) | 0x29;
         let mut commands = [read_command, 0x0, 0x0, 0x0];
-        let result = resources.ACCEL.transfer(&mut commands[..]).unwrap();
+        let result = cx.resources.accel.transfer(&mut commands[..]).unwrap();
         let acc_x = result[1] as i8;
         let acc_y = result[3] as i8;
-        resources.ACCEL_CS.set_high();
+        cx.resources.accel_cs.set_high();
 
         if acc_x == 0 && acc_y == 0 {
-            resources
-                .SERIAL_TX
+            cx.resources
+                .serial_tx
                 .lock(|serial_tx| writeln!(serial_tx, "level\r").unwrap());
         }
 
-        resources.LED_RING.lock(|led_ring| {
+        let reschedule = cx.resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_accel() {
                 let directions = [acc_y < 0, acc_x < 0, acc_y > 0, acc_x > 0];
                 led_ring.specific_on(directions);
-                schedule.accel_leds(scheduled + PERIOD.cycles()).unwrap();
+                true
+            } else {
+                false
             }
-        })
+        });
+
+        if reschedule {
+            cx.schedule
+                .accel_leds(Instant::now() + PERIOD.cycles())
+                .unwrap();
+        }
     }
 
     /// Interrupt handler that writes that the button is pressed to the serial interface
     /// and reverses the LED ring cycle direction.
-    #[interrupt(binds = EXTI0, resources = [BUTTON, EXTI_CNTR, LED_RING, SERIAL_TX])]
-    fn button_pressed() {
-        resources.LED_RING.lock(|led_ring| led_ring.reverse());
+    #[task(binds = EXTI0, resources = [button, exit_cntr, led_ring, serial_tx])]
+    fn button_pressed(mut cx: button_pressed::Context) {
+        cx.resources.led_ring.lock(|led_ring| led_ring.reverse());
 
         // Write the fact that the button has been pressed to the serial port.
-        resources
-            .SERIAL_TX
+        cx.resources
+            .serial_tx
             .lock(|serial_tx| writeln!(serial_tx, "button\r").unwrap());
 
-        resources
-            .BUTTON
-            .clear_interrupt_pending_bit(resources.EXTI_CNTR);
+        cx.resources
+            .button
+            .clear_interrupt_pending_bit(cx.resources.exit_cntr);
     }
 
     /// Interrupt handler that reads data from the serial connection and handles commands
     /// once an appropriate command is in the buffer.
-    #[interrupt(
+    #[task(
         binds = USART2,
         priority = 2,
-        resources = [BUFFER, LED_RING, SERIAL_RX, SERIAL_TX],
+        resources = [buffer, led_ring, serial_rx, serial_tx],
         spawn = [accel_leds, cycle_leds]
     )]
-    fn handle_serial() {
-        let buffer = resources.BUFFER;
+    fn handle_serial(cx: handle_serial::Context) {
+        let buffer = cx.resources.buffer;
 
         // Read a byte from the serial port and write it back.
-        let byte = resources.SERIAL_RX.read().unwrap();
-        block!(resources.SERIAL_TX.write(byte)).unwrap();
+        let byte = cx.resources.serial_rx.read().unwrap();
+        block!(cx.resources.serial_tx.write(byte)).unwrap();
         //hprintln!("serial: {}", byte).unwrap();
 
         // Handle the command in the buffer for newline or backspace, otherwise append to the
         // buffer.
         if byte == b'\r' {
-            block!(resources.SERIAL_TX.write(b'\n')).unwrap();
+            block!(cx.resources.serial_tx.write(b'\n')).unwrap();
             match &buffer[..] {
                 b"flip" => {
-                    resources.LED_RING.reverse();
+                    cx.resources.led_ring.reverse();
                 }
                 b"stop" => {
-                    resources.LED_RING.disable();
+                    cx.resources.led_ring.disable();
                 }
                 b"cycle" => {
-                    resources.LED_RING.enable_cycle();
-                    spawn.cycle_leds().unwrap();
+                    cx.resources.led_ring.enable_cycle();
+                    cx.spawn.cycle_leds().unwrap();
                 }
                 b"accel" => {
-                    resources.LED_RING.enable_accel();
-                    spawn.accel_leds().unwrap();
+                    cx.resources.led_ring.enable_accel();
+                    cx.spawn.accel_leds().unwrap();
                 }
                 b"off" => {
-                    resources.LED_RING.disable();
-                    resources.LED_RING.all_off();
+                    cx.resources.led_ring.disable();
+                    cx.resources.led_ring.all_off();
                 }
                 b"on" => {
-                    resources.LED_RING.disable();
-                    resources.LED_RING.all_on();
+                    cx.resources.led_ring.disable();
+                    cx.resources.led_ring.all_on();
                 }
                 _ => {
-                    writeln!(resources.SERIAL_TX, "?\r").unwrap();
+                    writeln!(cx.resources.serial_tx, "?\r").unwrap();
                 }
             }
 
             buffer.clear();
         } else if byte == 0x7F {
             buffer.pop();
-            block!(resources.SERIAL_TX.write(b'\r')).unwrap();
+            block!(cx.resources.serial_tx.write(b'\r')).unwrap();
             for byte in buffer {
-                block!(resources.SERIAL_TX.write(*byte)).unwrap();
+                block!(cx.resources.serial_tx.write(*byte)).unwrap();
             }
         } else {
             if buffer.push(byte).is_err() {
