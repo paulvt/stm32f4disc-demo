@@ -50,7 +50,7 @@ const APP: () = {
         /// The on-board blue user-controlled button.
         button: UserButton,
         /// The interrupt controll for the EXTI interrupt (related to the user button).
-        exit_cntr: EXTI,
+        exti_cntr: EXTI,
         /// The "ring" formed by the four on-board leds.
         led_ring: LedRing<Led>,
         /// The receiving part of the serial interface.
@@ -128,7 +128,7 @@ const APP: () = {
             accel_cs: accel_cs,
             buffer: buffer,
             button: button,
-            exit_cntr: exti_cntr,
+            exti_cntr: exti_cntr,
             led_ring: led_ring,
             serial_rx: serial_rx,
             serial_tx: serial_tx,
@@ -191,7 +191,7 @@ const APP: () = {
 
     /// Interrupt handler that writes that the button is pressed to the serial interface
     /// and reverses the LED ring cycle direction.
-    #[task(binds = EXTI0, resources = [button, exit_cntr, led_ring, serial_tx])]
+    #[task(binds = EXTI0, resources = [button, exti_cntr, led_ring, serial_tx])]
     fn button_pressed(mut cx: button_pressed::Context) {
         cx.resources.led_ring.lock(|led_ring| led_ring.reverse());
 
@@ -202,7 +202,7 @@ const APP: () = {
 
         cx.resources
             .button
-            .clear_interrupt_pending_bit(cx.resources.exit_cntr);
+            .clear_interrupt_pending_bit(cx.resources.exti_cntr);
     }
 
     /// Interrupt handler that reads data from the serial connection and handles commands
