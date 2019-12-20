@@ -9,11 +9,11 @@ authors = ["Paul van Tilburg <paul@luon.net>"]
 readme = "README.md"
 
 [dependencies]
-cortex-m = "0.5.8"
-cortex-m-rt = "0.6.5"
-cortex-m-semihosting = "0.3.2"
+cortex-m = "0.6.1"
+cortex-m-rt = "0.6.11"
+cortex-m-semihosting = "0.3.5"
 heapless = "0.4.2"
-panic-semihosting = "0.5.1"
+panic-semihosting = "0.5.3"
 
 [dependencies.cortex-m-rtfm]
 version = "0.5.0"
