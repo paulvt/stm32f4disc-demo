@@ -136,7 +136,7 @@ const APP: () = {
     }
 
     /// Task that advances the LED ring one step and schedules the next trigger (if enabled).
-    #[task(schedule = [cycle_leds], resources = [led_ring])]
+    #[task(resources = [led_ring], schedule = [cycle_leds])]
     fn cycle_leds(mut cx: cycle_leds::Context) {
         let reschedule = cx.resources.led_ring.lock(|led_ring| {
             if led_ring.is_mode_cycle() {
@@ -156,7 +156,7 @@ const APP: () = {
 
     /// Task that performs an accelerometers measurement and adjusts the LED ring accordingly
     /// and schedules the next trigger (if enabled).
-    #[task(schedule = [accel_leds], resources = [accel, accel_cs, led_ring, serial_tx])]
+    #[task(resources = [accel, accel_cs, led_ring, serial_tx], schedule = [accel_leds])]
     fn accel_leds(mut cx: accel_leds::Context) {
         cx.resources.accel_cs.set_low().unwrap();
         let read_command = (1 << 7) | (1 << 6) | 0x29;
