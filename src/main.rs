@@ -41,13 +41,21 @@ const PERIOD: u32 = 8_000_000;
 #[app(device = hal::stm32, monotonic = rtfm::cyccnt::CYCCNT, peripherals = true)]
 const APP: () = {
     struct Resources {
+        /// The on-board accelerometer.
         accel: Accelerometer,
+        /// The control port for indicating data is being written to/read from the accelerometer.
         accel_cs: AccelerometerCs,
+        /// The buffer used to capture incoming user commands via the serial inerface.
         buffer: Vec<u8, U8>,
+        /// The on-board blue user-controlled button.
         button: UserButton,
+        /// The interrupt controll for the EXTI interrupt (related to the user button).
         exit_cntr: EXTI,
+        /// The "ring" formed by the four on-board leds.
         led_ring: LedRing<Led>,
+        /// The receiving part of the serial interface.
         serial_rx: SerialRx,
+        /// The transmitting part of the serial interface.
         serial_tx: SerialTx,
     }
 
@@ -112,7 +120,7 @@ const APP: () = {
         let _ = accel.transfer(&mut [0x20, 0b01000111]).unwrap();
         accel_cs.set_high().unwrap();
 
-        // Output to the serial interface that initialisation is finished.
+        // Output to the serial interface that initialization is finished.
         writeln!(serial_tx, "init\r").unwrap();
 
         init::LateResources {
