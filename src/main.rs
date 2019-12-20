@@ -108,9 +108,9 @@ const APP: () = {
         let mut accel_cs = gpioe.pe3.into_push_pull_output();
 
         // Initialize the accelerometer.
-        accel_cs.set_low();
+        accel_cs.set_low().unwrap();
         let _ = accel.transfer(&mut [0x20, 0b01000111]).unwrap();
-        accel_cs.set_high();
+        accel_cs.set_high().unwrap();
 
         // Output to the serial interface that initialisation is finished.
         writeln!(serial_tx, "init\r").unwrap();
@@ -150,13 +150,13 @@ const APP: () = {
     /// and schedules the next trigger (if enabled).
     #[task(schedule = [accel_leds], resources = [accel, accel_cs, led_ring, serial_tx])]
     fn accel_leds(mut cx: accel_leds::Context) {
-        cx.resources.accel_cs.set_low();
+        cx.resources.accel_cs.set_low().unwrap();
         let read_command = (1 << 7) | (1 << 6) | 0x29;
         let mut commands = [read_command, 0x0, 0x0, 0x0];
         let result = cx.resources.accel.transfer(&mut commands[..]).unwrap();
         let acc_x = result[1] as i8;
         let acc_y = result[3] as i8;
-        cx.resources.accel_cs.set_high();
+        cx.resources.accel_cs.set_high().unwrap();
 
         if acc_x == 0 && acc_y == 0 {
             cx.resources

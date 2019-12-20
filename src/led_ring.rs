@@ -1,6 +1,7 @@
 //! Module for manipulating the LED ring.
 
-use hal::prelude::_embedded_hal_digital_OutputPin as OutputPin;
+use core::convert::Infallible;
+use hal::prelude::_embedded_hal_digital_v2_OutputPin as OutputPin;
 
 /// The cycle direction of the LED ring.
 ///
@@ -52,7 +53,7 @@ pub struct LedRing<LED> {
 
 impl<LED> LedRing<LED>
 where
-    LED: OutputPin,
+    LED: OutputPin<Error = Infallible>,
 {
     /// Sets up the LED ring using using four LED GPIO outputs.
     pub fn from(leds: [LED; 4]) -> LedRing<LED> {
@@ -114,8 +115,8 @@ where
     pub fn advance(&mut self) {
         let num_leds = self.leds.len();
 
-        self.leds[self.index].set_high();
-        self.leds[(self.index + 2) % num_leds].set_low();
+        self.leds[self.index].set_high().unwrap();
+        self.leds[(self.index + 2) % num_leds].set_low().unwrap();
 
         self.index = match self.direction {
             Direction::Clockwise => (self.index + 1) % num_leds,
@@ -128,7 +129,7 @@ where
     /// This is done immediately, regardless of the current mode.
     pub fn all_on(&mut self) {
         for led in self.leds.iter_mut() {
-            led.set_high();
+            led.set_high().unwrap();
         }
     }
 
@@ -137,7 +138,7 @@ where
     /// This is done immediately, regardless of the current mode.
     pub fn all_off(&mut self) {
         for led in self.leds.iter_mut() {
-            led.set_low();
+            led.set_low().unwrap();
         }
     }
 
@@ -148,9 +149,9 @@ where
     pub fn specific_on(&mut self, directions: [bool; 4]) {
         for (led, on_off) in self.leds.iter_mut().zip(directions.iter()) {
             if *on_off {
-                led.set_high();
+                led.set_high().unwrap();
             } else {
-                led.set_low();
+                led.set_low().unwrap();
             }
         }
     }
@@ -164,7 +165,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Direction, LedRing, Mode, OutputPin};
+    use super::{Direction, Infallible, LedRing, Mode, OutputPin};
 
     #[derive(Debug, Eq, PartialEq)]
     struct MockOutputPin {
@@ -183,12 +184,16 @@ mod tests {
     }
 
     impl OutputPin for MockOutputPin {
-        fn set_high(&mut self) {
+        type Error = Infallible;
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
             self.state = true;
+            Ok(())
         }
 
-        fn set_low(&mut self) {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
             self.state = false;
+            Ok(())
         }
     }
 
